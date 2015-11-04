@@ -1,3 +1,4 @@
 config.yaml
 vendor/bundle
 .bundle
+.idea

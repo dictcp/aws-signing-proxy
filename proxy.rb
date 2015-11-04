@@ -11,6 +11,7 @@ config = YAML.load_file('config.yaml')
 UPSTREAM_URL = config['upstream_url']
 UPSTREAM_SERVICE_NAME = config['upstream_service_name']
 UPSTREAM_REGION = config['upstream_region']
+LISTEN_PORT = config['listen_port'] || 8080
 
 
 unless ENV['AWS_ACCESS_KEY_ID'].nil? || ENV['AWS_SECRET_ACCESS_KEY'].nil? || ENV['AWS_SESSION_TOKEN'].nil?
@@ -40,4 +41,8 @@ app = Proc.new do |env|
     [response.status, {}, [response.body]]
 end
 
-Rack::Handler::WEBrick.run app
+webrick_options = {
+  :Port => LISTEN_PORT,
+}
+
+Rack::Handler::WEBrick.run app, webrick_options
