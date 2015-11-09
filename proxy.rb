@@ -6,7 +6,7 @@ require 'faraday_middleware/aws_signers_v4'
 require 'net/http/persistent'
 require 'yaml'
 
-config = YAML.load_file('config.yaml')
+config = YAML.load_file(File.dirname(File.expand_path(__FILE__)) + '/config.yaml')
 
 UPSTREAM_URL = config['upstream_url']
 UPSTREAM_SERVICE_NAME = config['upstream_service_name']
@@ -21,28 +21,34 @@ else
 end
 
 app = Proc.new do |env|
-    postdata = env['rack.input'].read
+  postdata = env['rack.input'].read
 
-    client = Faraday.new(url: UPSTREAM_URL) do |faraday|
-      faraday.request(:aws_signers_v4, credentials: CREDENTIALS, service_name: UPSTREAM_SERVICE_NAME, region: UPSTREAM_REGION)
-      faraday.adapter(:net_http_persistent)
-    end
+  client = Faraday.new(url: UPSTREAM_URL) do |faraday|
+    faraday.request(:aws_signers_v4, credentials: CREDENTIALS, service_name: UPSTREAM_SERVICE_NAME, region: UPSTREAM_REGION)
+    faraday.adapter(:net_http_persistent)
+  end
 
-    if env['REQUEST_METHOD'] == 'GET'
-      response = client.get "#{env['REQUEST_PATH']}?#{env['QUERY_STRING']}"
-    elsif env['REQUEST_METHOD'] == 'HEAD'
-      response = client.head "#{env['REQUEST_PATH']}?#{env['QUERY_STRING']}"
-    elsif env['REQUEST_METHOD'] == 'POST'
-      response = client.post "#{env['REQUEST_PATH']}?#{env['QUERY_STRING']}", "#{postdata}"
-    else
-      response = nil
-    end
-    puts "#{response.status} #{env['REQUEST_METHOD']} #{env['REQUEST_PATH']}?#{env['QUERY_STRING']} #{postdata}"
-    [response.status, {}, [response.body]]
+  headers = env.select {|k,v| k.start_with? 'HTTP_', 'CONTENT_' }
+                .map{|key,val| [ key.sub(/^HTTP_/,''), val ] }
+                .map{|key,val| { key.sub(/_/,'-') => val} }
+                .select {|key,_| key != 'HOST'}
+                .reduce Hash.new, :merge
+
+  if env['REQUEST_METHOD'] == 'GET'
+    response = client.get "#{env['REQUEST_PATH']}?#{env['QUERY_STRING']}", {}, headers
+  elsif env['REQUEST_METHOD'] == 'HEAD'
+    response = client.head "#{env['REQUEST_PATH']}?#{env['QUERY_STRING']}", {}, headers
+  elsif env['REQUEST_METHOD'] == 'POST'
+    response = client.post "#{env['REQUEST_PATH']}?#{env['QUERY_STRING']}", "#{postdata}", headers
+  else
+    response = nil
+  end
+  puts "#{response.status} #{env['REQUEST_METHOD']} #{env['REQUEST_PATH']}?#{env['QUERY_STRING']} #{postdata}"
+  [response.status, response.headers, [response.body]]
 end
 
 webrick_options = {
-  :Port => LISTEN_PORT,
+    :Port => LISTEN_PORT,
 }
 
 Rack::Handler::WEBrick.run app, webrick_options
