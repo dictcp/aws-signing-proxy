@@ -19,7 +19,7 @@ app = Proc.new do |env|
 
   headers = env.select {|k,v| k.start_with? 'HTTP_', 'CONTENT_' }
                 .map{|key,val| [ key.sub(/^HTTP_/,''), val ] }
-                .map{|key,val| { key.sub(/_/,'-') => val} }
+                .map{|key,val| { key.gsub(/_/,'-') => val} }
                 .select {|key,_| key != 'HOST'}
                 .reduce Hash.new, :merge
 
