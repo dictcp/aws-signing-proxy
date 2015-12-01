@@ -12,3 +12,4 @@ Small reverse proxy that signs http requests to AWS services on the fly using IA
             proxy_pass http://127.0.0.1:8080;
     }
 ```
+- It requires Ruby >= 2.0 (sorry for Debian 7 users)
